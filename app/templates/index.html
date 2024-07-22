@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aquatic Organism Detection</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Aquatic Organism Detection</h1>
+        <div class="upload-section">
+            <form id="upload-form" enctype="multipart/form-data">
+                <label for="video">Video File:</label>
+                <input type="file" id="video" name="video" accept="video/*" required><br><br>
+                <label for="csv">Annotations CSV:</label>
+                <input type="file" id="csv" name="csv" accept=".csv" required><br><br>
+                <button type="submit">Upload</button>
+            </form>
+        </div>
+        <div class="processing">Processing...</div>
+        <div class="results"></div>
+    </div>
+
+    <script>
+        document.getElementById('upload-form').onsubmit = async function(event) {
+            event.preventDefault();
+            document.querySelector('.processing').style.display = 'block';
+            const formData = new FormData(this);
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            document.querySelector('.processing').style.display = 'none';
+            const resultsDiv = document.querySelector('.results');
+            resultsDiv.innerHTML = `
+                <h2>Detections</h2>
+                <pre>${JSON.stringify(data.detections, null, 2)}</pre>
+                <h2>Annotated</h2>
+                <pre>${JSON.stringify(data.annotated, null, 2)}</pre>
+                <h2>Unannotated</h2>
+                <pre>${JSON.stringify(data.unannotated, null, 2)}</pre>
+            `;
+        };
+    </script>
+</body>
+</html>
