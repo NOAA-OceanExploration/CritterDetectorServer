@@ -38,13 +38,19 @@ def process_video(video_path, annotations_path, testing=False):
     # Run the model to detect organisms
     detections = model.detect(video_path)
     
-    # Read the annotations
+    # Read the annotations from the CSV
     annotations = pd.read_csv(annotations_path)
     
-    # Get the list of annotated timecodes
-    annotated_timecodes = annotations['timecode'].tolist()
+    # Extract the relevant time column
+    # Assuming the 'Start Date' column indicates the time of annotation
+    annotations['Start Date'] = pd.to_datetime(annotations['Start Date'], errors='coerce')
+    annotations = annotations.dropna(subset=['Start Date'])
+    annotated_timecodes = annotations['Start Date'].apply(lambda x: x.timestamp()).tolist()
     
-    # Find unannotated detections
-    unannotated_detections = [tc for tc in detections if not any(abs(tc - a) < 1 for a in annotated_timecodes)]
+    # Find unannotated detections (detections not close to any annotated timecode)
+    unannotated_detections = [
+        tc for tc in detections
+        if not any(abs(tc - a) < 1 for a in annotated_timecodes)
+    ]
     
     return detections, annotated_timecodes, unannotated_detections
