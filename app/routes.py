@@ -1,9 +1,9 @@
-from flask import render_template, request, jsonify, send_file
+from flask import render_template, request, jsonify, send_file, current_app
 from app import app
 from app.utils import convert_to_mp4, process_video
 from werkzeug.utils import secure_filename
 import os
-import pandas as pd
+from app.model import OrganismDetectionModel
 
 @app.route('/')
 def index():
@@ -11,6 +11,10 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload():
+    # Initialize the model with the TESTING configuration
+    testing_mode = current_app.config.get('TESTING', False)
+    model = OrganismDetectionModel(testing=testing_mode)
+
     # Check if the post request has the file part
     if 'video' not in request.files or 'csv' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -35,7 +39,7 @@ def upload():
     # Convert video to MP4 if necessary
     mp4_video_path = convert_to_mp4(video_path)
     
-    # Process the video and annotations
+    # Process the video and annotations using the initialized model
     detections, annotated, unannotated = process_video(mp4_video_path, csv_path)
 
     # Return the results as JSON
@@ -53,6 +57,10 @@ def download(list_type):
 
     # Assuming the lists are stored in session or temporary files
     list_file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{list_type}.csv")
+
+    # Check if the file exists
+    if not os.path.exists(list_file_path):
+        return jsonify({'error': 'File not found'}), 404
 
     # Send the file for download
     return send_file(list_file_path, as_attachment=True)

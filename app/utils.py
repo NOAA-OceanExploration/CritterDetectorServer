@@ -1,7 +1,7 @@
 import os
 import moviepy.editor as mp
 import pandas as pd
-from app.model import model
+from app.model import OrganismDetectionModel
 
 def convert_to_mp4(filepath):
     """
@@ -20,17 +20,21 @@ def convert_to_mp4(filepath):
         return new_filepath
     return filepath
 
-def process_video(video_path, annotations_path):
+def process_video(video_path, annotations_path, testing=False):
     """
     Process the video to detect organisms and compare the detections with annotations.
     
     Args:
     video_path (str): Path to the MP4 video file.
     annotations_path (str): Path to the CSV file containing annotations.
+    testing (bool): Flag indicating if the mock model should be used.
     
     Returns:
     tuple: Lists of detections, annotated timecodes, and unannotated detections.
     """
+    # Instantiate the model with the testing flag
+    model = OrganismDetectionModel(testing=testing)
+    
     # Run the model to detect organisms
     detections = model.detect(video_path)
     

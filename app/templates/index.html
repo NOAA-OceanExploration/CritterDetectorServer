@@ -18,21 +18,21 @@
                 <button type="submit">Upload</button>
             </form>
         </div>
-        <div class="processing">Processing...</div>
+        <div id="processing" class="processing" style="display:none;">Processing...</div>
         <div class="results"></div>
     </div>
 
     <script>
         document.getElementById('upload-form').onsubmit = async function(event) {
             event.preventDefault();
-            document.querySelector('.processing').style.display = 'block';
+            document.getElementById('processing').style.display = 'block';
             const formData = new FormData(this);
             const response = await fetch('/upload', {
                 method: 'POST',
                 body: formData
             });
             const data = await response.json();
-            document.querySelector('.processing').style.display = 'none';
+            document.getElementById('processing').style.display = 'none';
             const resultsDiv = document.querySelector('.results');
             resultsDiv.innerHTML = `
                 <h2>Detections</h2>
