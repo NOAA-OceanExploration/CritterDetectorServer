@@ -1,6 +1,6 @@
 Certainly! Here is the plain text for the README file:
 
-# Aquatic Organism Detection
+# CritterDetector
 
 This project is a web application that allows users to upload a video file and a CSV file of annotations. The application processes the video to detect unique organisms and compares these detections with the provided annotations. The results are displayed on the web interface, highlighting detections without annotations.
 
