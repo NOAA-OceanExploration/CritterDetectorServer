@@ -1,9 +1,9 @@
 from flask import render_template, request, jsonify, send_file, current_app
 from app import app
-from app.utils import convert_to_mp4, process_video
 from werkzeug.utils import secure_filename
 import os
-from app.model import OrganismDetectionModel
+import time
+import json
 
 @app.route('/')
 def index():
@@ -38,13 +38,40 @@ def upload():
         'unannotated': unannotated
     })
 
+@app.route('/demo', methods=['GET'])
+def demo():
+    # Demo mode flag
+    demo_mode = True
+    
+    # Predefined demo files
+    video_filename = "demo_video.mp4"
+    csv_filename = "demo_annotations.csv"
+    detections_data_file = "demo_detections.json"
+
+    video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
+    csv_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
+    
+    # Simulate processing time with a 2-minute progress bar
+    time.sleep(120)  # Simulate 2 minutes of processing time
+
+    # Load the predefined detection data
+    with open(os.path.join(app.config['UPLOAD_FOLDER'], detections_data_file), 'r') as f:
+        detections_data = json.load(f)
+
+    # Return the predefined results as if they were processed
+    return jsonify({
+        'detections': detections_data['detections'],
+        'annotated': detections_data['annotated'],
+        'unannotated': detections_data['unannotated']
+    })
+
 @app.route('/download/<list_type>', methods=['GET'])
 def download(list_type):
     list_types = ['detections', 'annotated', 'unannotated']
     if list_type not in list_types:
         return jsonify({'error': 'Invalid list type'}), 400
 
-    # Assuming the lists are stored in session or temporary files
+    # Path to the requested data
     list_file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{list_type}.csv")
 
     # Check if the file exists

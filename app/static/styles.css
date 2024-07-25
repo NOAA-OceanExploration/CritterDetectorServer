@@ -54,12 +54,41 @@ h1 {
     background-color: #004d40;
 }
 
+/* Demo Section Styles */
+.demo-section {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.demo-section button {
+    background-color: #29b6f6;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.demo-section button:hover {
+    background-color: #0288d1;
+}
+
 /* Processing Section Styles */
 .processing {
     display: none; /* Hidden initially */
     text-align: center;
     font-size: 18px;
     color: #00796b;
+    margin: 20px 0;
+}
+
+.progress-bar {
+    height: 20px;
+    background-color: #4caf50;
+    width: 0%;
+    transition: width 0.5s ease;
+    border-radius: 5px;
 }
 
 /* Results Section Styles */

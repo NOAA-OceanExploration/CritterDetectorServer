@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CritterDetector</title>
+    <title>CritterDetector Demo</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>CritterDetector</h1>
+        <h1>CritterDetector Demo</h1>
         <div class="upload-section">
             <form id="upload-form" enctype="multipart/form-data">
                 <label for="video">Video File:</label>
@@ -18,14 +18,43 @@
                 <button type="submit">Upload</button>
             </form>
         </div>
-        <div id="processing" class="processing" style="display:none;">Processing...</div>
+        <div class="demo-section">
+            <button id="start-demo">Start Demo</button>
+        </div>
+        <div id="processing" class="processing" style="display:none;">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+            Processing...
+        </div>
         <div class="results"></div>
     </div>
 
     <script>
+        // Function to simulate a progress bar
+        function simulateProgressBar(duration) {
+            const progressBar = document.getElementById('progress-bar');
+            let startTime = null;
+
+            function updateProgress(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+                const progress = Math.min((elapsed / duration) * 100, 100);
+                progressBar.style.width = progress + '%';
+
+                if (elapsed < duration) {
+                    requestAnimationFrame(updateProgress);
+                } else {
+                    progressBar.style.width = '100%';
+                }
+            }
+
+            requestAnimationFrame(updateProgress);
+        }
+
+        // Handle the form submission for the upload
         document.getElementById('upload-form').onsubmit = async function(event) {
             event.preventDefault();
             document.getElementById('processing').style.display = 'block';
+            simulateProgressBar(120000); // 2 minutes in milliseconds
             const formData = new FormData(this);
             const response = await fetch('/upload', {
                 method: 'POST',
@@ -33,6 +62,21 @@
             });
             const data = await response.json();
             document.getElementById('processing').style.display = 'none';
+            displayResults(data);
+        };
+
+        // Handle the demo button click
+        document.getElementById('start-demo').onclick = async function() {
+            document.getElementById('processing').style.display = 'block';
+            simulateProgressBar(120000); // 2 minutes in milliseconds
+            const response = await fetch('/demo');
+            const data = await response.json();
+            document.getElementById('processing').style.display = 'none';
+            displayResults(data);
+        };
+
+        // Function to display results
+        function displayResults(data) {
             const resultsDiv = document.querySelector('.results');
             resultsDiv.innerHTML = `
                 <h2>Detections</h2>
@@ -42,7 +86,7 @@
                 <h2>Unannotated</h2>
                 <pre>${JSON.stringify(data.unannotated, null, 2)}</pre>
             `;
-        };
+        }
     </script>
 </body>
 </html>
