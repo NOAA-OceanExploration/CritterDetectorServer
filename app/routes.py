@@ -40,30 +40,18 @@ def upload():
 
 @app.route('/demo', methods=['GET'])
 def demo():
-    # Demo mode flag
-    demo_mode = True
-    
-    # Predefined demo files
-    video_filename = "demo_video.mp4"
-    csv_filename = "demo_annotations.csv"
-    detections_data_file = "demo_detections.json"
-
-    video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
-    csv_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
+    # Path to the demo JSON file
+    demo_data_path = os.path.join(app.config['UPLOAD_FOLDER'], 'demo', 'demo_detections.json')
     
     # Simulate processing time with a 2-minute progress bar
     time.sleep(120)  # Simulate 2 minutes of processing time
 
     # Load the predefined detection data
-    with open(os.path.join(app.config['UPLOAD_FOLDER'], detections_data_file), 'r') as f:
+    with open(demo_data_path, 'r') as f:
         detections_data = json.load(f)
 
     # Return the predefined results as if they were processed
-    return jsonify({
-        'detections': detections_data['detections'],
-        'annotated': detections_data['annotated'],
-        'unannotated': detections_data['unannotated']
-    })
+    return jsonify(detections_data)
 
 @app.route('/download/<list_type>', methods=['GET'])
 def download(list_type):
