@@ -4,12 +4,13 @@ This project is a web application that allows users to upload a video file and a
 
 ## Features
 
-- Upload a video file and an annotations CSV file.
-- Convert the video to MP4 format if necessary.
-- Detect unique organisms in the video using a PyTorch model.
-- Compare detections with annotations and highlight unannotated detections.
-- Display results on the web interface.
-- Download lists of all detections, annotated timecodes, and unannotated detections.
+Upload a video file and an annotations CSV file.
+Convert the video to MP4 format if necessary.
+Detect unique organisms in the video using a PyTorch model.
+Compare detections with annotations and highlight unannotated detections.
+Display results on the web interface.
+Download lists of all detections, annotated timecodes, and unannotated detections.
+Demo Mode: Run a demo with predefined video and annotation data.
 
 ## Requirements
 
@@ -79,6 +80,25 @@ This project is a web application that allows users to upload a video file and a
 3. **Download the lists:**
    - You can download the lists of all detections, annotated timecodes, and unannotated detections.
 
+## Demo Mode
+The demo mode allows you to experience the application's functionality with predefined data.
+
+1. **Run the demo:**
+Click the "Start Demo" button on the homepage.
+The application will simulate processing the demo data with a progress bar.
+
+
+2. **View the demo results:**
+
+Predefined results will be displayed, showing detections, annotated timecodes, and unannotated detections.
+
+## Demo Files
+For the demo mode, ensure the following files are placed in the uploads/ directory:
+
+- demo_video.mp4: The predefined video file used for the demo.
+- demo_annotations.csv: The predefined CSV file containing annotations for the demo video.
+- demo_detections.json: A JSON file with the predefined detection data.
+
 ## Project Structure
 
 ```
@@ -97,6 +117,9 @@ aquatic_detection_app/
 ├── uploads/
 │   ├── (uploaded video files)
 │   ├── (uploaded CSV files)
+│   ├── demo_video.mp4
+│   ├── demo_annotations.csv
+│   └── demo_detections.json
 │
 ├── requirements.txt
 ├── config.py
