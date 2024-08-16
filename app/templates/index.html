@@ -75,11 +75,14 @@
         function displayResults(data) {
             const resultsDiv = document.querySelector('.results');
             let resultsHTML = `<h2>Detections</h2>`;
-            data.detections.forEach(detection => {
+            data.detections.forEach((detection, index) => {
                 resultsHTML += `
-                    <div class="detection">
+                    <div class="detection" id="detection-${index}">
                         <p>Time: ${detection.time}s</p>
+                        <p>Description: <span id="description-${index}">${detection.description}</span></p>
                         <img src="/uploads/demo/cropped/${detection.image}" alt="Detection Image">
+                        <button onclick="rejectAnnotation(${index})">Reject</button>
+                        <button onclick="editDescription(${index})">Edit Description</button>
                     </div>
                 `;
             });
@@ -94,6 +97,57 @@
                 <p>Unannotated Detected Entities: ${data.total_unannotated_detected || 'N/A'}</p>
             `;
             resultsDiv.innerHTML = resultsHTML;
+        }
+
+        async function rejectAnnotation(index) {
+            if (confirm('Are you sure you want to reject this annotation?')) {
+                try {
+                    const response = await fetch('/reject_annotation', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ index: index }),
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        document.getElementById(`detection-${index}`).style.display = 'none';
+                    } else {
+                        alert('Failed to reject annotation: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('An error occurred while rejecting the annotation.');
+                }
+            }
+        }
+
+        function editDescription(index) {
+            const descriptionSpan = document.getElementById(`description-${index}`);
+            const currentDescription = descriptionSpan.textContent;
+            const newDescription = prompt('Enter new description:', currentDescription);
+            
+            if (newDescription !== null && newDescription !== currentDescription) {
+                fetch('/edit_description', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ index: index, newDescription: newDescription }),
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        descriptionSpan.textContent = newDescription;
+                    } else {
+                        alert('Failed to update description: ' + result.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while updating the description.');
+                });
+            }
         }
     </script>
 </body>
