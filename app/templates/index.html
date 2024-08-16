@@ -29,7 +29,6 @@
     </div>
 
     <script>
-        // Function to simulate a progress bar
         function simulateProgressBar(duration) {
             const progressBar = document.getElementById('progress-bar');
             let startTime = null;
@@ -50,7 +49,6 @@
             requestAnimationFrame(updateProgress);
         }
 
-        // Handle the form submission for the upload
         document.getElementById('upload-form').onsubmit = async function(event) {
             event.preventDefault();
             document.getElementById('processing').style.display = 'block';
@@ -65,7 +63,6 @@
             displayResults(data);
         };
 
-        // Handle the demo button click
         document.getElementById('start-demo').onclick = async function() {
             document.getElementById('processing').style.display = 'block';
             simulateProgressBar(120000); // 2 minutes in milliseconds
@@ -75,33 +72,28 @@
             displayResults(data);
         };
 
-        // Function to display results
         function displayResults(data) {
             const resultsDiv = document.querySelector('.results');
-            resultsDiv.innerHTML = `
-                <h2>Detections</h2>
-                ${data.detections.map(detection => `
-                    <div>
-                        <h3>Time: ${detection.time}</h3>
-                        <p>${detection.description}</p>
-                        <img src="uploads/demo/${detection.image}" alt="Detection Image" style="max-width: 100%;">
+            let resultsHTML = `<h2>Detections</h2>`;
+            data.detections.forEach(detection => {
+                resultsHTML += `
+                    <div class="detection">
+                        <p>Time: ${detection.time}s</p>
+                        <img src="/uploads/demo/cropped/${detection.image}" alt="Detection Image">
                     </div>
-                `).join('')}
+                `;
+            });
+            resultsHTML += `
                 <h2>Annotated</h2>
-                ${data.annotated.map(annotation => `
-                    <div>
-                        <h3>Time: ${annotation.time}</h3>
-                        <p>${annotation.description}</p>
-                    </div>
-                `).join('')}
+                <pre>${JSON.stringify(data.annotated, null, 2)}</pre>
                 <h2>Unannotated</h2>
-                ${data.unannotated.map(unannotated => `
-                    <div>
-                        <h3>Time: ${unannotated.time}</h3>
-                        <p>${unannotated.description}</p>
-                    </div>
-                `).join('')}
+                <pre>${JSON.stringify(data.unannotated, null, 2)}</pre>
+                <h2>Summary</h2>
+                <p>Total Annotations: ${data.total_annotations || 'N/A'}</p>
+                <p>Annotated Detected Entities: ${data.total_annotated_detected || 'N/A'}</p>
+                <p>Unannotated Detected Entities: ${data.total_unannotated_detected || 'N/A'}</p>
             `;
+            resultsDiv.innerHTML = resultsHTML;
         }
     </script>
 </body>
