@@ -13,8 +13,6 @@
             <form id="upload-form" enctype="multipart/form-data">
                 <label for="video">Video File:</label>
                 <input type="file" id="video" name="video" accept="video/*" required><br><br>
-                <label for="csv">Annotations CSV:</label>
-                <input type="file" id="csv" name="csv" accept=".csv" required><br><br>
                 <button type="submit">Upload</button>
             </form>
         </div>
@@ -49,93 +47,81 @@
         document.getElementById('upload-form').onsubmit = async function(event) {
             event.preventDefault();
             document.getElementById('processing').style.display = 'block';
-            simulateProgressBar(120000); // 2 minutes in milliseconds
+            simulateProgressBar(30000); // 30 seconds in milliseconds
             const formData = new FormData(this);
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            document.getElementById('processing').style.display = 'none';
-            displayResults(data);
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.error) {
+                    // Display error message
+                    document.getElementById('processing').style.display = 'none';
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                document.getElementById('processing').style.display = 'none';
+                displayResults(data);
+            } catch (error) {
+                document.getElementById('processing').style.display = 'none';
+                alert('Error uploading file: ' + error);
+            }
         };
 
         function displayResults(data) {
             const resultsDiv = document.querySelector('.results');
-            let resultsHTML = `<h2>Detections</h2>`;
+            let resultsHTML = `
+                <h2>Timeline</h2>
+                <img src="data:image/png;base64,${data.timeline_image}" alt="Timeline">
+                <button onclick="downloadJSON(${JSON.stringify(data)})">Download Results JSON</button>
+                <h2>Detections</h2>`;
+            
             data.detections.forEach((detection, index) => {
                 resultsHTML += `
                     <div class="detection" id="detection-${index}">
                         <p>Time: ${detection.time}s</p>
-                        <p>Description: <span id="description-${index}">${detection.description}</span></p>
-                        <img src="/uploads/demo/cropped/${detection.image}" alt="Detection Image">
-                        <button onclick="rejectAnnotation(${index})">Reject</button>
-                        <button onclick="editDescription(${index})">Edit Description</button>
+                        <p>Description: ${detection.description}</p>
+                        <p>Confidence: ${(detection.confidence * 100).toFixed(2)}%</p>
+                        <img src="data:image/jpeg;base64,${detection.image}" alt="Detection Image">
                     </div>
                 `;
             });
+
             resultsHTML += `
-                <h2>Annotated</h2>
-                <pre>${JSON.stringify(data.annotated, null, 2)}</pre>
-                <h2>Unannotated</h2>
-                <pre>${JSON.stringify(data.unannotated, null, 2)}</pre>
-                <h2>Summary</h2>
-                <p>Total Annotations: ${data.total_annotations || 'N/A'}</p>
-                <p>Annotated Detected Entities: ${data.total_annotated_detected || 'N/A'}</p>
-                <p>Unannotated Detected Entities: ${data.total_unannotated_detected || 'N/A'}</p>
+                <h2>Video Info</h2>
+                <p>Name: ${data.video_info.name}</p>
+                <p>Duration: ${data.video_info.duration}s</p>
+                <p>FPS: ${data.video_info.fps}</p>
+                <p>Total Frames: ${data.video_info.frame_count}</p>
             `;
+            
             resultsDiv.innerHTML = resultsHTML;
         }
 
-        async function rejectAnnotation(index) {
-            if (confirm('Are you sure you want to reject this annotation?')) {
-                try {
-                    const response = await fetch('/reject_annotation', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ index: index }),
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        document.getElementById(`detection-${index}`).style.display = 'none';
-                    } else {
-                        alert('Failed to reject annotation: ' + result.message);
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('An error occurred while rejecting the annotation.');
-                }
-            }
-        }
+        function downloadJSON(data) {
+            // Create a clean version of the data without the timeline image
+            const downloadData = {
+                video_info: data.video_info,
+                detections: data.detections.map(det => ({
+                    time: det.time,
+                    description: det.description,
+                    confidence: det.confidence,
+                    bbox: det.bbox,
+                    frame_number: det.frame_number
+                }))
+            };
 
-        function editDescription(index) {
-            const descriptionSpan = document.getElementById(`description-${index}`);
-            const currentDescription = descriptionSpan.textContent;
-            const newDescription = prompt('Enter new description:', currentDescription);
-            
-            if (newDescription !== null && newDescription !== currentDescription) {
-                fetch('/edit_description', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ index: index, newDescription: newDescription }),
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        descriptionSpan.textContent = newDescription;
-                    } else {
-                        alert('Failed to update description: ' + result.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred while updating the description.');
-                });
-            }
+            const dataStr = JSON.stringify(downloadData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = window.URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${data.video_info.name}_results.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
         }
     </script>
 </body>

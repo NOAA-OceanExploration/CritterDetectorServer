@@ -159,3 +159,21 @@ pre {
         margin-right: 0;
     }
 }
+
+/* Download Button Style */
+.results button {
+    display: block;
+    margin: 20px auto;
+    background-color: #00796b;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.results button:hover {
+    background-color: #004d40;
+}

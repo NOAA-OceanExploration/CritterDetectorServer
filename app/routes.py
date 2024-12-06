@@ -1,26 +1,17 @@
 import os
-import time
-import json
-import pandas as pd
-from io import StringIO
-from flask import Flask, render_template, request, jsonify, send_file, current_app, send_from_directory, abort
+from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 from moviepy.editor import VideoFileClip
 from owl_highlighter import OWLHighlighter
 import base64
 from io import BytesIO
-
-app = Flask(__name__)
-app.config.from_object(Config)
+from app import app
 
 # Initialize the highlighter
-highlighter = OWLHighlighter(score_threshold=0.3)
+highlighter = OWLHighlighter(score_threshold=0.95)
 
 # Ensure the upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-# Global variable to store detections (in a real application, use a database)
-global_detections = []
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -47,54 +38,57 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload():
     try:
-        if 'video' not in request.files or 'csv' not in request.files:
-            return jsonify({'error': 'No file part'}), 400
+        if 'video' not in request.files:
+            print("No video file in request")  # Debug log
+            return jsonify({'error': 'No video file provided'}), 400
 
         video = request.files['video']
-        csv_file = request.files['csv']
+        print(f"Received file: {video.filename}")  # Debug log
 
-        if video.filename == '' or csv_file.filename == '':
+        if video.filename == '':
+            print("Empty filename")  # Debug log
             return jsonify({'error': 'No selected file'}), 400
 
         if not allowed_file(video.filename):
+            print(f"File type not allowed: {video.filename}")  # Debug log
             return jsonify({'error': 'Invalid video file type'}), 400
 
-        # Save files
+        # Save video file
         video_filename = secure_filename(video.filename)
-        csv_filename = secure_filename(csv_file.filename)
         video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
-        csv_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
-        
         video.save(video_path)
-        csv_file.save(csv_path)
+        print(f"Saved file to: {video_path}")  # Debug log
 
         try:
+            # Convert video to MP4 if needed
+            print("Converting video to MP4...")
+            mp4_path = convert_to_mp4(video_path)
+            print(f"Converted to MP4: {mp4_path}")  # Debug log
+
             # Process video with OWLHighlighter
+            print("Processing video with OWLHighlighter...")
             result = highlighter.process_video(
-                video_path=video_path,
-                class_names=['organism']
+                video_path=mp4_path
             )
 
             # Process results
-            processed_data = process_results(result, csv_path)
-            
-            # Store in global state
-            global global_detections
-            global_detections = processed_data['detections']
-
+            print("Processing results...")
+            processed_data = process_results(result)
+            print("Results processed successfully.")
             return jsonify(processed_data)
 
         finally:
             # Cleanup
             if os.path.exists(video_path):
                 os.remove(video_path)
-            if os.path.exists(csv_path):
-                os.remove(csv_path)
+            if 'mp4_path' in locals() and mp4_path != video_path and os.path.exists(mp4_path):
+                os.remove(mp4_path)
 
     except Exception as e:
+        print(f"Error processing video: {str(e)}")  # Debug log
         return jsonify({'error': str(e)}), 500
 
-def process_results(result, csv_path):
+def process_results(result):
     """Helper function to process OWLHighlighter results"""
     # Create timeline visualization
     timeline_path = os.path.join(app.config['UPLOAD_FOLDER'], 'timeline.png')
@@ -109,34 +103,18 @@ def process_results(result, csv_path):
             img_str = base64.b64encode(buffered.getvalue()).decode()
 
             detection = {
-                'id': len(detections) + 1,
-                'time': det.timestamp,
+                'time': float(det.timestamp),
                 'description': det.label,
-                'confidence': det.confidence,
+                'confidence': float(det.confidence),
                 'image': img_str,
-                'bbox': det.bbox,
-                'frame_number': det.frame_number
+                'bbox': [float(x) for x in det.bbox],
+                'frame_number': int(det.frame_number)
             }
             detections.append(detection)
 
         # Read timeline image
         with open(timeline_path, 'rb') as f:
             timeline_base64 = base64.b64encode(f.read()).decode()
-
-        # Process annotations
-        annotations_df = pd.read_csv(csv_path)
-        annotated_times = annotations_df['timecode'].tolist()
-
-        # Split into annotated/unannotated
-        annotated, unannotated = [], []
-        for detection in detections:
-            is_annotated = any(abs(detection['time'] - ann_time) < 1 
-                             for ann_time in annotated_times)
-            detection['is_annotated'] = is_annotated
-            if is_annotated:
-                annotated.append(detection)
-            else:
-                unannotated.append(detection)
 
         return {
             'video_info': {
@@ -146,128 +124,12 @@ def process_results(result, csv_path):
                 'duration': result.duration
             },
             'detections': detections,
-            'annotated': annotated,
-            'unannotated': unannotated,
-            'timeline_image': timeline_base64,
-            'total_annotations': len(annotated_times),
-            'total_annotated_detected': len(annotated),
-            'total_unannotated_detected': len(unannotated)
+            'timeline_image': timeline_base64
         }
 
     finally:
         if os.path.exists(timeline_path):
             os.remove(timeline_path)
-
-@app.route('/uploads/<path:filename>')
-def serve_uploads(filename):
-    if filename.startswith('uploads/'):
-        filename = filename[8:]
-
-    base_dir = app.config['UPLOAD_FOLDER']
-    full_path = os.path.join(base_dir, filename)
-    app.logger.debug(f"Full path: {full_path}")
-
-    if not os.path.exists(full_path):
-        app.logger.debug(f"File not found: {full_path}")
-        return abort(404)
-
-    directory = os.path.dirname(full_path)
-    filename = os.path.basename(full_path)
-
-    return send_from_directory(directory, filename)
-
-@app.route('/reject_annotation', methods=['POST'])
-def reject_annotation():
-    data = request.json
-    detection_id = data.get('id')
-    
-    global global_detections
-    
-    # Find the detection with the given id and mark it as rejected
-    for detection in global_detections:
-        if detection['id'] == detection_id:
-            detection['rejected'] = True
-            break
-    
-    return jsonify({
-        'success': True,
-        'message': f'Annotation with id {detection_id} rejected'
-    })
-
-@app.route('/edit_description', methods=['POST'])
-def edit_description():
-    data = request.json
-    detection_id = data.get('id')
-    new_description = data.get('newDescription')
-    
-    global global_detections
-    
-    # Find the detection with the given id and update its description
-    for detection in global_detections:
-        if detection['id'] == detection_id:
-            detection['description'] = new_description
-            detection['edited'] = True
-            break
-    
-    return jsonify({
-        'success': True,
-        'message': f'Description for detection with id {detection_id} updated to "{new_description}"'
-    })
-
-@app.route('/get_updated_detections', methods=['GET'])
-def get_updated_detections():
-    global global_detections
-    
-    # Filter out rejected detections
-    active_detections = [d for d in global_detections if not d.get('rejected', False)]
-    
-    annotated = [d for d in active_detections if d.get('is_annotated', False)]
-    unannotated = [d for d in active_detections if not d.get('is_annotated', False)]
-    
-    return jsonify({
-        'detections': active_detections,
-        'annotated': annotated,
-        'unannotated': unannotated,
-        'total_annotations': len(annotated),
-        'total_annotated_detected': len(annotated),
-        'total_unannotated_detected': len(unannotated)
-    })
-
-@app.route('/download/<list_type>', methods=['GET'])
-def download(list_type):
-    global global_detections
-
-    list_types = ['detections', 'annotated', 'unannotated']
-    if list_type not in list_types:
-        return jsonify({'error': 'Invalid list type'}), 400
-
-    # Filter detections based on list_type
-    if list_type == 'detections':
-        data = global_detections
-    elif list_type == 'annotated':
-        data = [d for d in global_detections if d.get('is_annotated', False) and not d.get('rejected', False)]
-    else:  # unannotated
-        data = [d for d in global_detections if not d.get('is_annotated', False) and not d.get('rejected', False)]
-
-    # Create a DataFrame
-    df = pd.DataFrame(data)
-    
-    # Add columns to indicate if a detection was edited or rejected
-    df['edited'] = df['edited'].fillna(False)
-    df['rejected'] = df['rejected'].fillna(False)
-
-    # Convert DataFrame to CSV
-    csv_buffer = StringIO()
-    df.to_csv(csv_buffer, index=False)
-    csv_buffer.seek(0)
-
-    # Send the CSV file
-    return send_file(
-        csv_buffer,
-        mimetype='text/csv',
-        as_attachment=True,
-        attachment_filename=f'{list_type}.csv'
-    )
 
 if __name__ == '__main__':
     app.run(debug=True)
