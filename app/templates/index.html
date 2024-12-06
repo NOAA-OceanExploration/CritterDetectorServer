@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CritterDetector Demo</title>
+    <title>CritterDetector</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>CritterDetector Demo</h1>
+        <h1>CritterDetector</h1>
         <div class="upload-section">
             <form id="upload-form" enctype="multipart/form-data">
                 <label for="video">Video File:</label>
@@ -74,7 +74,7 @@
             let resultsHTML = `
                 <h2>Timeline</h2>
                 <img src="data:image/png;base64,${data.timeline_image}" alt="Timeline">
-                <button onclick="downloadJSON(${JSON.stringify(data)})">Download Results JSON</button>
+                <button id="downloadButton">Download Results JSON</button>
                 <h2>Detections</h2>`;
             
             data.detections.forEach((detection, index) => {
@@ -97,6 +97,11 @@
             `;
             
             resultsDiv.innerHTML = resultsHTML;
+            
+            // Add event listener to the download button
+            document.getElementById('downloadButton').addEventListener('click', () => {
+                downloadJSON(data);
+            });
         }
 
         function downloadJSON(data) {
