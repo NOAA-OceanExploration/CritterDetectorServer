@@ -11,11 +11,7 @@ import base64
 from io import BytesIO
 
 app = Flask(__name__)
-
-# Configuration
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB limit
-app.config['ALLOWED_EXTENSIONS'] = {'mp4', 'mov', 'avi'}
+app.config.from_object(Config)
 
 # Initialize the highlighter
 highlighter = OWLHighlighter(score_threshold=0.3)
@@ -161,20 +157,6 @@ def process_results(result, csv_path):
     finally:
         if os.path.exists(timeline_path):
             os.remove(timeline_path)
-
-@app.route('/demo', methods=['GET'])
-def demo():
-    """Load and return demo data"""
-    demo_data_path = os.path.join(app.config['UPLOAD_FOLDER'], 'demo', 'demo_detections.json')
-    time.sleep(5)  # Simulate processing time
-
-    with open(demo_data_path, 'r') as f:
-        detections_data = json.load(f)
-    
-    global global_detections
-    global_detections = detections_data['detections']
-
-    return jsonify(detections_data)
 
 @app.route('/uploads/<path:filename>')
 def serve_uploads(filename):

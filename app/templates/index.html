@@ -18,9 +18,6 @@
                 <button type="submit">Upload</button>
             </form>
         </div>
-        <div class="demo-section">
-            <button id="start-demo">Start Demo</button>
-        </div>
         <div id="processing" class="processing" style="display:none;">
             <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
             Processing...
@@ -58,15 +55,6 @@
                 method: 'POST',
                 body: formData
             });
-            const data = await response.json();
-            document.getElementById('processing').style.display = 'none';
-            displayResults(data);
-        };
-
-        document.getElementById('start-demo').onclick = async function() {
-            document.getElementById('processing').style.display = 'block';
-            simulateProgressBar(120000); // 2 minutes in milliseconds
-            const response = await fetch('/demo');
             const data = await response.json();
             document.getElementById('processing').style.display = 'none';
             displayResults(data);
