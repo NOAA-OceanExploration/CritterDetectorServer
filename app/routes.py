@@ -8,7 +8,7 @@ from io import BytesIO
 from app import app
 
 # Initialize the highlighter
-highlighter = OWLHighlighter(score_threshold=0.95)
+highlighter = OWLHighlighter(score_threshold=0.85)
 
 # Ensure the upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
