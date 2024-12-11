@@ -10,11 +10,15 @@
     <div class="container">
         <h1>CritterDetector</h1>
         <div class="upload-section">
-            <form id="upload-form" enctype="multipart/form-data">
-                <label for="video">Video File:</label>
+            <form id="queue-form" enctype="multipart/form-data">
+                <label for="video">Video Files:</label>
                 <input type="file" id="video" name="video" accept="video/*" required><br><br>
-                <button type="submit">Upload</button>
+                <button type="submit">Add to Queue</button>
             </form>
+            <div id="queue-status">
+                Files in queue: <span id="queue-count">0</span>
+            </div>
+            <button id="process-queue" style="display: none;">Process Queue</button>
         </div>
         <div id="processing" class="processing" style="display:none;">
             <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
@@ -24,109 +28,143 @@
     </div>
 
     <script>
-        function simulateProgressBar(duration) {
-            const progressBar = document.getElementById('progress-bar');
-            let startTime = null;
-
-            function updateProgress(timestamp) {
-                if (!startTime) startTime = timestamp;
-                const elapsed = timestamp - startTime;
-                const progress = Math.min((elapsed / duration) * 100, 100);
-                progressBar.style.width = progress + '%';
-
-                if (elapsed < duration) {
-                    requestAnimationFrame(updateProgress);
-                } else {
-                    progressBar.style.width = '100%';
-                }
-            }
-
-            requestAnimationFrame(updateProgress);
-        }
-
-        document.getElementById('upload-form').onsubmit = async function(event) {
+        let queueCount = 0;
+        
+        document.getElementById('queue-form').onsubmit = async function(event) {
             event.preventDefault();
-            document.getElementById('processing').style.display = 'block';
-            simulateProgressBar(30000); // 30 seconds in milliseconds
             const formData = new FormData(this);
+            
             try {
-                const response = await fetch('/upload', {
+                const response = await fetch('/queue_file', {
                     method: 'POST',
                     body: formData
                 });
+
                 const data = await response.json();
                 if (data.error) {
-                    // Display error message
-                    document.getElementById('processing').style.display = 'none';
                     alert('Error: ' + data.error);
                     return;
                 }
-                document.getElementById('processing').style.display = 'none';
-                displayResults(data);
+                
+                queueCount++;
+                document.getElementById('queue-count').textContent = queueCount;
+                document.getElementById('process-queue').style.display = 'block';
+                this.reset();
+                
             } catch (error) {
-                document.getElementById('processing').style.display = 'none';
-                alert('Error uploading file: ' + error);
+                alert('Error queuing file: ' + error);
             }
         };
 
-        function displayResults(data) {
+        document.getElementById('process-queue').onclick = async function() {
+            const processingDiv = document.getElementById('processing');
+            const progressBar = document.getElementById('progress-bar');
+            processingDiv.style.display = 'block';
+            
+            const eventSource = new EventSource('/progress');
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.progress >= 0) {
+                        progressBar.style.width = `${data.progress}%`;
+                    }
+                } catch (error) {
+                    console.error('Error parsing progress:', error);
+                }
+            };
+
+            try {
+                await fetch('/process_queue', { method: 'POST' });
+                
+                // Poll for results
+                const checkResults = async () => {
+                    const response = await fetch('/get_results');
+                    const data = await response.json();
+                    displayResults(data.results);
+                    
+                    if (data.results.length < queueCount) {
+                        setTimeout(checkResults, 1000);
+                    } else {
+                        processingDiv.style.display = 'none';
+                        eventSource.close();
+                    }
+                };
+                
+                checkResults();
+                
+            } catch (error) {
+                alert('Error processing queue: ' + error);
+                processingDiv.style.display = 'none';
+                eventSource.close();
+            }
+        };
+
+        function displayResults(results) {
             const resultsDiv = document.querySelector('.results');
             let resultsHTML = `
-                <h2>Timeline</h2>
-                <img src="data:image/png;base64,${data.timeline_image}" alt="Timeline">
-                <button id="downloadButton">Download Results JSON</button>
-                <h2>Detections</h2>`;
+                <button id="downloadButton">Download All Results</button>
+                <h2>Processed Videos</h2>`;
             
-            data.detections.forEach((detection, index) => {
+            results.forEach((data, videoIndex) => {
                 resultsHTML += `
-                    <div class="detection" id="detection-${index}">
-                        <p>Time: ${detection.time}s</p>
-                        <p>Description: ${detection.description}</p>
-                        <p>Confidence: ${(detection.confidence * 100).toFixed(2)}%</p>
-                        <img src="data:image/jpeg;base64,${detection.image}" alt="Detection Image">
+                    <div class="video-result">
+                        <h3>Video: ${data.video_info.name}</h3>
+                        <img src="data:image/png;base64,${data.timeline_image}" alt="Timeline">
+                        <h4>Detections</h4>
+                        <div class="detections-grid">`;
+                
+                data.detections.forEach((detection, index) => {
+                    resultsHTML += `
+                        <div class="detection" id="detection-${videoIndex}-${index}">
+                            <p>Time: ${detection.time}s</p>
+                            <p>Description: ${detection.description}</p>
+                            <p>Confidence: ${(detection.confidence * 100).toFixed(2)}%</p>
+                            <img src="data:image/jpeg;base64,${detection.image}" alt="Detection Image">
+                        </div>`;
+                });
+                
+                resultsHTML += `
                     </div>
-                `;
+                    <div class="video-info">
+                        <p>Duration: ${data.video_info.duration}s</p>
+                        <p>FPS: ${data.video_info.fps}</p>
+                        <p>Total Frames: ${data.video_info.frame_count}</p>
+                    </div>
+                </div>`;
             });
-
-            resultsHTML += `
-                <h2>Video Info</h2>
-                <p>Name: ${data.video_info.name}</p>
-                <p>Duration: ${data.video_info.duration}s</p>
-                <p>FPS: ${data.video_info.fps}</p>
-                <p>Total Frames: ${data.video_info.frame_count}</p>
-            `;
             
             resultsDiv.innerHTML = resultsHTML;
             
-            // Add event listener to the download button
             document.getElementById('downloadButton').addEventListener('click', () => {
-                downloadJSON(data);
+                downloadAllResults(results);
             });
         }
 
-        function downloadJSON(data) {
-            // Create a clean version of the data without the timeline image
-            const downloadData = {
-                video_info: data.video_info,
-                detections: data.detections.map(det => ({
-                    time: det.time,
-                    description: det.description,
-                    confidence: det.confidence,
-                    bbox: det.bbox,
-                    frame_number: det.frame_number
-                }))
-            };
+        function downloadAllResults(results) {
+            results.forEach(data => {
+                // Download JSON
+                const downloadData = {
+                    video_info: data.video_info,
+                    detections: data.detections.map(det => ({
+                        time: det.time,
+                        description: det.description,
+                        confidence: det.confidence,
+                        bbox: det.bbox,
+                        frame_number: det.frame_number
+                    }))
+                };
 
-            const dataStr = JSON.stringify(downloadData, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            const url = window.URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${data.video_info.name}_results.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+                const dataStr = JSON.stringify(downloadData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = window.URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${data.video_info.name}_results.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            });
         }
     </script>
 </body>

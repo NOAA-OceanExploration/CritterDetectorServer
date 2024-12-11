@@ -8,15 +8,21 @@ from io import BytesIO
 from app import app
 import queue
 import threading
+from collections import deque
 
 # Initialize the highlighter
-highlighter = OWLHighlighter(score_threshold=0.92)
+highlighter = OWLHighlighter(score_threshold=0.87)
 
 # Ensure the upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Add a global progress queue
 progress_queue = queue.Queue()
+
+# Add these global variables
+file_queue = deque()
+processing_lock = threading.Lock()
+processed_results = []
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -113,6 +119,69 @@ def upload():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/queue_file', methods=['POST'])
+def queue_file():
+    try:
+        if 'video' not in request.files:
+            return jsonify({'error': 'No video file provided'}), 400
+
+        video = request.files['video']
+        if video.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+
+        if not allowed_file(video.filename):
+            return jsonify({'error': 'Invalid video file type'}), 400
+
+        video_filename = secure_filename(video.filename)
+        video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
+        video.save(video_path)
+        
+        file_queue.append(video_path)
+        return jsonify({'message': 'File queued successfully', 'position': len(file_queue)})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/process_queue', methods=['POST'])
+def process_queue():
+    def process_files():
+        while file_queue:
+            with processing_lock:
+                if not file_queue:
+                    break
+                video_path = file_queue.popleft()
+
+            try:
+                progress_queue.put(0)
+                mp4_path = convert_to_mp4(video_path)
+                progress_queue.put(10)
+
+                def progress_update(p):
+                    progress = 10 + int(p * 0.9)
+                    progress_queue.put(progress)
+
+                result = highlighter.process_video(
+                    video_path=mp4_path,
+                    progress_callback=progress_update
+                )
+
+                progress_queue.put(100)
+                processed_data = process_results(result)
+                processed_results.append(processed_data)
+
+            finally:
+                if os.path.exists(video_path):
+                    os.remove(video_path)
+                if 'mp4_path' in locals() and mp4_path != video_path and os.path.exists(mp4_path):
+                    os.remove(mp4_path)
+
+    threading.Thread(target=process_files).start()
+    return jsonify({'message': 'Processing started'})
+
+@app.route('/get_results', methods=['GET'])
+def get_results():
+    return jsonify({'results': processed_results})
 
 def process_results(result):
     """Helper function to process OWLHighlighter results"""
