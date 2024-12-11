@@ -11,7 +11,7 @@ import threading
 from collections import deque
 
 # Initialize the highlighter
-highlighter = OWLHighlighter(score_threshold=0.87)
+highlighter = OWLHighlighter(score_threshold=0.87, show_labels=True)
 
 # Ensure the upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -23,6 +23,7 @@ progress_queue = queue.Queue()
 file_queue = deque()
 processing_lock = threading.Lock()
 processed_results = []
+file_queue_options = deque()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -79,6 +80,8 @@ def upload():
             return jsonify({'error': 'No video file provided'}), 400
 
         video = request.files['video']
+        show_labels = request.form.get('showLabels', 'true') == 'true'  # Get checkbox value
+        
         if video.filename == '':
             return jsonify({'error': 'No selected file'}), 400
 
@@ -102,6 +105,9 @@ def upload():
                 progress = 10 + int(p * 0.9)
                 progress_queue.put(progress)
 
+            # Update the highlighter settings before processing
+            highlighter.show_labels = show_labels
+            
             result = highlighter.process_video(
                 video_path=mp4_path,
                 progress_callback=progress_update
@@ -127,6 +133,8 @@ def queue_file():
             return jsonify({'error': 'No video file provided'}), 400
 
         video = request.files['video']
+        show_labels = request.form.get('showLabels', 'true') == 'true'
+        
         if video.filename == '':
             return jsonify({'error': 'No selected file'}), 400
 
@@ -138,6 +146,8 @@ def queue_file():
         video.save(video_path)
         
         file_queue.append(video_path)
+        file_queue_options.append({'showLabels': show_labels})
+        
         return jsonify({'message': 'File queued successfully', 'position': len(file_queue)})
 
     except Exception as e:
@@ -151,6 +161,7 @@ def process_queue():
                 if not file_queue:
                     break
                 video_path = file_queue.popleft()
+                show_labels = file_queue_options.popleft()['showLabels']  # Get the options
 
             try:
                 progress_queue.put(0)
@@ -161,6 +172,9 @@ def process_queue():
                     progress = 10 + int(p * 0.9)
                     progress_queue.put(progress)
 
+                # Update the highlighter settings before processing
+                highlighter.show_labels = show_labels
+                
                 result = highlighter.process_video(
                     video_path=mp4_path,
                     progress_callback=progress_update

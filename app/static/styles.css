@@ -220,3 +220,21 @@ pre {
     width: 100% !important;
     height: auto !important;
 }
+
+.checkbox-container {
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.checkbox-container input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+
+.checkbox-container label {
+    margin: 0;
+    cursor: pointer;
+}

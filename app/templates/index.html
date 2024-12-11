@@ -12,7 +12,13 @@
         <div class="upload-section">
             <form id="queue-form" enctype="multipart/form-data">
                 <label for="video">Video Files:</label>
-                <input type="file" id="video" name="video" accept="video/*" required><br><br>
+                <input type="file" id="video" name="video" accept="video/*" required><br>
+                
+                <div class="checkbox-container">
+                    <input type="checkbox" id="showLabels" name="showLabels" checked>
+                    <label for="showLabels">Include Prospective Organism Categorizations</label>
+                </div>
+                
                 <button type="submit">Add to Queue</button>
             </form>
             <div id="queue-status">
@@ -33,6 +39,8 @@
         document.getElementById('queue-form').onsubmit = async function(event) {
             event.preventDefault();
             const formData = new FormData(this);
+            const showLabels = document.getElementById('showLabels').checked;
+            formData.append('showLabels', showLabels);
             
             try {
                 const response = await fetch('/queue_file', {
