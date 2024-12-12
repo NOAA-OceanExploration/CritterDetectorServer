@@ -10,4 +10,8 @@ fi
 echo "Installing requirements..."
 pip install -r requirements.txt
 
+# Install PyTorch with CUDA support
+echo "Installing PyTorch with CUDA support..."
+pip3 install torch torchvision torchaudio
+
 echo "All requirements have been installed."
